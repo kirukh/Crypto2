@@ -1,0 +1,24 @@
+# Python (falls du später Code hinzufügst)
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# optional: pytest-benchmark JSON-Export
+benchmark_results.json
+*.egg-info/
+dist/
+build/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Präsentation: ggf. große Exporte nur bei Bedarf
+# *.pptx
+
+# Literatur: keine geschützten Volltexte versionieren
+# (bewusst keine feste Regel — du entscheidest, was du committest)
