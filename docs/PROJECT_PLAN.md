@@ -21,15 +21,14 @@
 ```
 Stateful-Signatures-Project/
 ├── README.md
-├── docs/
-│   └── PROJECT_PLAN.md      # dieser Plan
-├── presentation/            # Folien
-├── literature/            # Notizen, BibTeX (keine geschützten PDFs committen)
-├── src/                   # optional: spätere Implementierung (aktuell leer)
+├── pyproject.toml
+├── docs/                    # Phasen, Gliederung, dieser Plan
+├── presentation/            # Folien (Quelle + PDF; siehe presentation/README.md)
+├── literature/              # BibTeX u. a. (keine geschützten Volltexte committen)
+├── src/stateful_signatures/ # Python-Paket (Lamport-OTS-Demo)
+├── tests/
 └── .gitignore
 ```
-
-Erweiterungen (wenn du Technik einführst): `tests/`, `requirements.txt`, `pyproject.toml`, … — dokumentieren in `README.md`.
 
 ---
 

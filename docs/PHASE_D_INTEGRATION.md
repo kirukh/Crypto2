@@ -10,9 +10,9 @@ Die Arbeit soll beim Leser nicht drei getrennte Blöcke („Theorie“, „Risik
 
 1. **Problemstellung:** Post-Quantum-Signaturen; hashbasierte **stateful** Verfahren (Fokus **XMSS**) verlangen **Zustandsführung** (Index / verbrauchte OTS-Einheiten) — siehe Phase A/B, Normen.
 2. **Fachliche Basis:** OTS + Merkle-Baum → **RFC 8391**; **SP 800-208** betont **Zustandsdisziplin** als Sicherheitsvoraussetzung.
-3. **Übergang zur Praxis:** Wo der gespeicherte Zustand **hinter** der Realität zurückbleibt (Backup, Restore, Klonen), entsteht das **Risiko der Wiederverwendung** — inhaltlich aus Phase B, Kapitel 5.
-4. **Illustration:** Das Repository enthält ein **absichtlich einfaches Modell** (HMAC + Index), das **dieses Zähler-/Restore-Dilemma** sichtbar macht — **ohne** XMSS zu implementieren (Phase C).
-5. **Grenze:** Was die Demo **nicht** leistet (kein Merkle, keine OTS-Sicherheit, kein Leistungsvergleich mit XMSS/ML-DSA) — Abschnitt 4 unten.
+3. **Übergang zur Praxis:** Wo der gespeicherte Zustand **hinter** der Realität zurückbleibt (Backup, Restore, Klonen), entsteht das **Risiko der Wiederverwendung** von OTS-Material — inhaltlich aus Phase B, Kapitel 5.
+4. **Illustration:** Das Repository enthält eine **Lamport-OTS**-Demo: Ein Schlüssel darf nur **einmal** signieren; nach simulierter **Wiederherstellung** eines „unbenutzt“-Zustands wird eine **zweite Signatur** möglich — dasselbe **prinzipielle** Dilemma wie veralteter Index bei XMSS, ohne Merkle/XMSS zu implementieren (Phase C).
+5. **Grenze:** Was die Demo **nicht** leistet (kein Merkle, kein Multi-OTS-XMSS, kein Leistungsvergleich mit ML-DSA) — Abschnitt 4 unten.
 
 Diese fünf Schritte lassen sich in der **Einleitung** andeuten und im **Fazit** wieder aufgreifen.
 
@@ -22,11 +22,11 @@ Diese fünf Schritte lassen sich in der **Einleitung** andeuten und im **Fazit**
 
 | Begriff / Thema | Wo in der Arbeit (Material) | Rolle des Codes (`stateful_signatures`) |
 |-----------------|----------------------------|-------------------------------------------|
-| Zustand / Index muss monoton | Phase B, Kapitel 3–4; Normen A | Signer erhöht `index` nach jedem `sign`. |
-| Backup älter als aktueller Stand | Phase B, Kapitel 5 | `from_state(..., index=2)` nach vorherigen Signaturen — **älterer** Index wird erneut verwendet. |
-| Verifikation bindet Index | Phase B, Kapitel 3–4; RFC-Kontext | `verify` nutzt `sig.index` in der MAC-Berechnung. |
-| XMSS, WOTS+, Merkle | Phase A/B, **nur Text** | **Nicht** im Code; Demo explizit als Modell bezeichnen. |
-| Benchmark | Phase C | Misst **nur** HMAC-Sign/Verify; **kein** XMSS-Throughput. |
+| Zustand / keine OTS-Wiederverwendung | Phase B, Kapitel 3–4; Normen | Nach `sign()` ist `is_used=True`; zweiter Aufruf auf demselben Objekt schlägt fehl. |
+| Backup / veralteter Zustand | Phase B, Kapitel 5 | `copy.deepcopy(signer)` + `is_used=False` modelliert Wiederherstellung, die den Verbrauch „vergisst“. |
+| Verifikation | Phase B; Lamport-Kontext | `verify_lamport` prüft Hash-Konsistenz pro Bit. |
+| XMSS, WOTS+, Merkle, mehrere OTS | Phase A/B, **nur Text** | **Nicht** im Code; Demo = **eine** Lamport-Instanz als kleinste OTS-Einheit. |
+| Benchmark | Phase C | Misst **nur** Lamport Sign/Verify; **kein** XMSS-Throughput. |
 
 Damit ist **Meilenstein M4** inhaltlich erfüllbar: Demo und Benchmark sind **mit der Theorie verzahnt**, nicht nur „Anhang mit Listing“.
 
@@ -36,7 +36,7 @@ Damit ist **Meilenstein M4** inhaltlich erfüllbar: Demo und Benchmark sind **mi
 
 *Zum Einfügen oder Umschreiben — auf ½–1 Seite in der End-PDF strecken oder auf 2–3 Absätze kürzen.*
 
-Die bisherigen Kapitel haben **XMSS** und **SP 800-208** / **RFC 8391** als fachliche Grundlage beschrieben und operative Risiken benannt, die entstehen, wenn der **persistierte Signaturzustand** nicht zum tatsächlichen Gebrauch passt. Um dieses **organisatorisch-kryptographische** Spannungsfeld **anschaulich** zu machen — ohne den Umfang einer Referenzimplementierung — enthält das begleitende Repository ein **Lehr-Modell**: Eine Signaturfunktion bindet eine Nachricht an einen **fortlaufenden Index** mittels **HMAC**; der Index modelliert den **Zustand**. Die Konsole führt ein kurzes Szenario aus, in dem nach mehreren Signaturen ein **älterer Zustand** wiederhergestellt wird und erneut signiert wird. So wird das **Dilemma inkonsistenter Backups** illustriert. **Abgrenzung:** Dieses Modell ist **kein** XMSS, implementiert **keine** Einmal-Signaturen nach RFC 8391 und erlaubt **keine** Schlussfolgerungen auf reale Durchsatz- oder Sicherheitswerte von XMSS; es unterstützt die **Erklärung** des Zustandsproblems. Ein **Micro-Benchmark** misst die Laufzeit von Sign- und Verify-Operationen **in diesem Modell** und dient höchstens der Groborientierung, nicht einem Vergleich mit standardisierten PQC-Verfahren.
+Die bisherigen Kapitel haben **XMSS** und **SP 800-208** / **RFC 8391** als fachliche Grundlage beschrieben und operative Risiken benannt, die entstehen, wenn der **persistierte Signaturzustand** nicht zum tatsächlichen Gebrauch passt. Um das **organisatorisch-kryptographische** Spannungsfeld **anschaulich** zu machen — ohne eine Referenz-XMSS-Implementierung — enthält das begleitende Repository eine **didaktische Lamport One-Time Signature**: Der private Signaturzustand wird nach einer Signatur als **verbraucht** markiert; wird derselbe Schlüssel nach einer **Wiederherstellung** fälschlich wieder als **frei** geführt, kann eine **weitere Signatur** erzeugt werden — **OTS-Wiederverwendung**. Das **Abgrenzung:** Dies ist **kein** XMSS (kein Merkle-Baum, keine WOTS+, keine RFC-8391-Konformität); die Lamport-Implementierung dient der **Veranschaulichung** des Zustands- und Backup-Problems. Ein **Micro-Benchmark** misst Sign- und Verify-Laufzeiten **in diesem Demo** und dient höchstens der Groborientierung, nicht einem Vergleich mit standardisierten PQC-Verfahren.
 
 ---
 
@@ -44,8 +44,8 @@ Die bisherigen Kapitel haben **XMSS** und **SP 800-208** / **RFC 8391** als fach
 
 In der Ausarbeitung mindestens **ein** zusammenhängender Absatz oder eine kurze Liste:
 
-- [ ] **Kein XMSS:** kein WOTS+, kein Merkle-Baum, keine RFC-8391-Konformität.
-- [ ] **Kein Sicherheitsbeweis** für das Demo-Modell als kryptographisches Verfahren; nur **didaktische** Analogie zum Zustand.
+- [ ] **Kein XMSS:** kein WOTS+, kein Merkle-Baum, keine RFC-8391-Konformität; nur **eine** Lamport-OTS-Instanz.
+- [ ] **Lehrcode:** keine Produktionsreife, kein Sicherheitsaudit; didaktische OTS-Logik, **kein** Ersatz für die Theorie in Norm und Literatur.
 - [ ] **Benchmark:** keine Übertragbarkeit auf XMSS/ML-DSA/SLH-DSA; keine Aussage „PQC ist schnell/langsam“ aus diesem Projekt allein.
 - [ ] **Produktion:** kein HSM, keine Side-Channel-Härtung, kein Einsatz für echte Geheimnisse.
 
@@ -55,9 +55,9 @@ In der Ausarbeitung mindestens **ein** zusammenhängender Absatz oder eine kurze
 
 | Folie / Block | Inhalt |
 |---------------|--------|
-| Problem | Stateful braucht zuverlässigen Zähler/Index (1–2 Stichpunkte + Norm). |
+| Problem | Stateful braucht zuverlässigen Zähler/Index bzw. verbrauchte OTS (1–2 Stichpunkte + Norm). |
 | Risiko | Backup/Restore kann Zustand zurücksetzen → Wiederverwendung (qualitativ). |
-| Demo | Terminal-Screenshot oder Live: `python -m stateful_signatures` — **einen Satz** „vereinfachtes Modell“. |
+| Demo | Terminal-Screenshot oder Live: `python -m stateful_signatures` — **einen Satz** „Lamport-OTS als Miniaturmodell, kein XMSS“. |
 | Grenze | Ein Satz: nicht XMSS, nur Illustration. |
 | Fazit | Zentraler Signaturdienst / klare Backup-Politik als Richtung (aus Phase B, Kapitel 6). |
 

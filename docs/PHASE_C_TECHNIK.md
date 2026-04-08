@@ -10,7 +10,7 @@
 |------------|-------------------|
 | Python | 3.10+ (im Projekt getestet: siehe eigene Umgebung) |
 | Paket | `stateful_signatures` (editable: `pip install -e ".[dev]"`) |
-| Demo | Nur **Standardbibliothek** (`hmac`, `hashlib`) |
+| Demo | Nur **Standardbibliothek** (`hashlib`, `os`, `copy`) |
 | Tests / Benchmark | `pytest`, `pytest-benchmark` (nur Entwicklungsabhängigkeiten) |
 
 ---
@@ -22,13 +22,14 @@ src/stateful_signatures/
 ├── __init__.py
 ├── __main__.py          # Einstieg: python -m stateful_signatures
 ├── demo.py              # CLI (Hilfe, ruft Szenario auf)
-└── stateful_demo.py     # Modell: StatefulSigner, verify, run_demo_scenario
+└── stateful_demo.py     # LamportOTS, verify_lamport, run_demo_scenario
 tests/
 ├── test_stateful_demo.py
+├── test_demo_cli.py
 └── test_benchmark_stateful.py
 ```
 
-**Abgrenzung:** `stateful_demo.py` implementiert **kein** XMSS, **keinen** Merkle-Baum, **keine** WOTS+ nach RFC 8391. Es ist ein **Lehr-Modell**: geheimer Schlüssel + **monotoner Index**, Signatur = HMAC-SHA256 über Nachricht und Index. So lassen sich **Zustand** und **Wiederherstellung eines älteren Index** demonstrieren, ohne die Komplexität einer Referenz-XMSS-Implementierung.
+**Abgrenzung:** `stateful_demo.py` implementiert **kein** XMSS, **keinen** Merkle-Baum, **keine** WOTS+ nach RFC 8391. Es enthält eine **didaktische Lamport One-Time Signature (OTS)** über SHA-256 (256 Bit Nachrichtenhash → 256 Geheimnisteile). Der **Zustand** ist `is_used`: nach einer Signatur ist der Schlüssel verbraucht. Ein Szenario simuliert **Wiederherstellung** eines Zustands, in dem „noch nicht signiert“ gilt — **OTS-Wiederverwendung** — und damit das gleiche **operative Risiko** wie veralteter Index/Backup bei XMSS (in der **Ausarbeitung** mit der Norm verknüpfen).
 
 ---
 
@@ -48,13 +49,13 @@ python -m stateful_signatures --help
 
 ### 3.2 Was das Szenario zeigt
 
-1. Mehrere Signaturen mit fortschreitendem **Index**.
-2. Gültige Verifikation einer weiteren Signatur.
-3. **Simulierte Wiederherstellung** eines **älteren** Zustands (`index = 2`), obwohl der „echte“ Signaturgegenstand schon weiter war — neue Signatur mit einem Index, der in der Realität **bereits durch höhere Indizes überholt** war (illustrativ für Backup/Restore-Probleme; in echten OTS/XMSS wäre die Kollisions-/Reuse-Problematik Sicherheitskern).
+1. Eine **erste Signatur** mit frischem Lamport-OTS (Zustand wechselt auf „verbraucht“).
+2. **Wiederherstellung** eines Zustands, in dem der OTS noch als **unbenutzt** gilt (`is_used=False`), obwohl bereits signiert wurde — analog zu veraltetem Backup / fehlendem Zählerstand.
+3. Eine **zweite Signatur** mit demselben Schlüsselmaterial wird möglich: **OTS-Wiederverwendung** (im echten XMSS-Kontext: gleiche Index-Position erneut — Sicherheitsproblem).
 
 ### 3.3 Für Präsentation / Video
 
-Terminal mit großer Schrift, oder Ausgabe in Datei umleiten (`> demo.txt`). Kurz **mündlich** einordnen: Modell vs. XMSS aus der Theorie.
+Terminal mit großer Schrift, oder Ausgabe in Datei umleiten (`> demo.txt`). Kurz **mündlich** einordnen: Lamport-OTS als **kleinste** Einheit; XMSS in der Theorie = viele OTS + Merkle + Index; Demo **illustriert** nur Zustand und Reuse.
 
 ---
 
@@ -86,16 +87,16 @@ Die Datei `benchmark_results.json` kann ins Repository **oder nur lokal** gelegt
 
 | Test | Operation |
 |------|-----------|
-| `test_benchmark_sign` | `StatefulSigner.sign` mit fester Nachricht |
-| `test_benchmark_verify` | `verify` mit fester Nachricht und vorher erzeugter Signatur |
+| `test_benchmark_sign` | `LamportOTS.sign` mit fester Nachricht (neuer Signer pro Runde wegen Zustand) |
+| `test_benchmark_verify` | `verify_lamport` mit fester Nachricht und vorher erzeugter Signatur |
 
 **Ausgabe:** pytest-benchmark liefert u. a. **Min / Max / Mean / Median**, **Rounds**, **OPS** (Operationen pro Sekunde, reziprok zum Mittelwert). Die absoluten Zahlen hängen von **CPU, Last, Python-Version** ab.
 
 ### 4.3 Einordnung (wichtig für die Arbeit)
 
-- Der Benchmark misst **nur** die Geschwindigkeit des **didaktischen HMAC-Modells**.
+- Der Benchmark misst **nur** die Geschwindigkeit der **didaktischen Lamport-OTS** (KeyGen + Sign bzw. Verify).
 - **Kein** Rückschluss auf XMSS-Leistung, **kein** Vergleich mit ML-DSA/SLH-DSA ohne separate, sauber parametrisierte Messung — das war in Phase A/B bereits konzeptionell begründet.
-- Sinnvolle Nutzung: **Kurz** in der Ausarbeitung („wir haben Sign/Verify im Demo-Modell gemessen; Größenordnung µs auf Referenzrechner X“) — oder **ein** Satz, dass Messwerte **reproduzierbar** mit `benchmark_results.json` und genannter Umgebung sind.
+- Sinnvolle Nutzung: **Kurz** in der Ausarbeitung („wir haben Sign/Verify im Demo gemessen; Größenordnung … auf Referenzrechner X“) — oder **ein** Satz, dass Messwerte **reproduzierbar** mit `benchmark_results.json` und genannter Umgebung sind.
 
 ---
 
@@ -103,11 +104,11 @@ Die Datei `benchmark_results.json` kann ins Repository **oder nur lokal** gelegt
 
 *Die folgenden Absätze kannst du straffen und für die 10-Seiten-PDF kürzen.*
 
-**Implementierung.** Im Repository liegt ein Python-Paket `stateful_signatures`. Es enthält ein **Lehr-Modell** zustandsbehafteten Signierens: Ein geheimer Schlüssel und ein fortlaufender **Index** werden beim Signieren verwendet; die „Signatur“ ist ein HMAC-SHA256 über die Nachricht und den Index. Es handelt sich **nicht** um eine Implementierung von XMSS gemäß RFC 8391 und **nicht** um eine normkonforme OTS — die theoretische Einordnung von XMSS, WOTS+ und SP 800-208 erfolgt ausschließlich im **theoretischen Teil**.
+**Implementierung.** Im Repository liegt ein Python-Paket `stateful_signatures`. Es enthält eine **didaktische Lamport-OTS**: 256 Bit-Blöcke aus dem privaten Schlüssel werden je nach gehashtem Nachrichtenbit offengelegt; nach einer Signatur ist der Schlüssel **verbraucht** (`is_used`). Es handelt sich **nicht** um XMSS gemäß RFC 8391 (kein Merkle, kein Index über viele OTS) — die theoretische Einordnung von XMSS, WOTS+ und SP 800-208 erfolgt im **theoretischen Teil**.
 
-**Demonstration.** Die Konsolenanwendung führt ein kurzes **Szenario** aus: mehrere Signaturen, anschließend die Simulation einer **Wiederherstellung eines älteren Zählerstands**, um das Risiko inkonsistenter Backups zu veranschaulichen.
+**Demonstration.** Die Konsole führt ein Szenario aus: Signatur, dann **Wiederherstellung** eines Zustands ohne Kenntnis des Verbrauchs — **zweite Signatur** mit demselben Material. Das illustriert **OTS-Wiederverwendung** und das Backup-/Zählerproblem qualitativ.
 
-**Benchmark.** Mit `pytest-benchmark` wurden die Operationen **Sign** und **Verify** im Demo-Modell auf dem verwendeten Rechner gemessen. Die Werte dienen der **Illustration der Rechenkosten** dieses minimalen Modells; sie ersetzen **keine** Aussage über produktive XMSS- oder PQC-Verfahren.
+**Benchmark.** Mit `pytest-benchmark` wurden **Sign** und **Verify** im Demo gemessen. Die Werte dienen der **Illustration der Rechenkosten** dieser minimalen OTS; sie ersetzen **keine** Aussage über produktives XMSS oder andere PQC-Verfahren.
 
 ---
 

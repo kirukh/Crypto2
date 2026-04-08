@@ -35,7 +35,7 @@ Umfang: **ca. 60 Stunden** inklusive **schriftlicher Ausarbeitung** und **Präse
 
 ## Technik (Python-Demo + Benchmark)
 
-Das Repository enthält eine **didaktische Referenzimplementierung** (kein vollständiges XMSS nach RFC 8391): ein **Modell** mit geheimem Schlüssel und **monotonem Signaturindex**, um Zustand, Verifikation und das Problem von **Backup/Restore** zu veranschaulichen. XMSS, Normen und echte Sicherheitseigenschaften bleiben in der **schriftlichen Ausarbeitung**; der Code ist als **Lehr-/Demonstrationscode** gekennzeichnet.
+Das Repository enthält eine **didaktische Lamport One-Time Signature** (kein XMSS/Merkle nach RFC 8391): Zustand **„Schlüssel verbraucht“** nach einer Signatur und ein Szenario **Wiederherstellung/Backup**, das **OTS-Wiederverwendung** möglich macht — analog zum Zähler-/Backup-Risiko bei XMSS. XMSS, Normen und vollständige Sicherheitsaussagen bleiben in der **schriftlichen Ausarbeitung**; der Code ist **Lehr-/Demonstrationscode**.
 
 **Voraussetzungen:** Python **3.10+**
 
@@ -44,6 +44,8 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
+
+**Hinweis:** `pip install -e ".[dev]"` in **diesem** Ordner ausführen, damit `python -m stateful_signatures` die Lamport-Demo aus diesem Repository lädt — nicht ein anderes Paket gleichen Namens von woanders auf dem `PYTHONPATH`.
 
 **Demo (Konsolenausgabe):**
 

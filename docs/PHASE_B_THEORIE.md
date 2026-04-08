@@ -112,7 +112,7 @@ Praktisch umfasst der Zustand mindestens:
 
 ### 5.3 Abgrenzung zum Projekt-Code
 
-Das Repository enthält ein **didaktisches Modell** (`stateful_signatures`): HMAC mit monotonem Index, **kein** XMSS nach RFC 8391. Es **illustriert** das Zähler- und Restore-Problem. In der Ausarbeitung klar trennen: **Theorie/XMSS/OTS** vs. **Demo-Modell** — letzteres dient der Anschauung, nicht dem kryptographischen Nachweis.
+Das Repository enthält eine **didaktische Lamport-OTS** (`stateful_signatures`): ein Einmal-Schlüssel mit Zustand „verbraucht“, **kein** XMSS nach RFC 8391 (kein Merkle, keine WOTS+). Es **illustriert** OTS-Wiederverwendung nach veraltetem Zustand — analog zum Zähler-/Backup-Problem bei XMSS. In der Ausarbeitung klar trennen: **Theorie/XMSS** vs. **Demo** — letztere dient der Anschauung, nicht dem kryptographischen Nachweis für produktive Systeme.
 
 ---
 
@@ -130,7 +130,7 @@ Protokollierung: wer signiert, welcher Index, Zeitstempel; Alarme bei **Lücken*
 
 ### 6.3 Grenzen des studentischen Demonstrators
 
-Die bereitgestellte Software ist **minimal**, **nicht** side-channel-härt, **nicht** auditierbar im Sinne einer Produktionsfreigabe. Sie zeigt **ein** Aspekt (Monotonie des Index nach simuliertem Restore). Aussagen über reale XMSS-Deployments bleiben **literatur- und normgestützt**, nicht „weil die Demo schnell war“.
+Die bereitgestellte Software ist **minimal**, **nicht** side-channel-härt, **nicht** auditierbar im Sinne einer Produktionsfreigabe. Sie zeigt **ein** Aspekt (Lamport-OTS und simulierte Wiederherstellung eines „unbenutzt“-Zustands). Aussagen über reale XMSS-Deployments bleiben **literatur- und normgestützt**, nicht „weil die Demo schnell war“.
 
 ---
 

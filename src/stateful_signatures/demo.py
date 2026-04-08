@@ -12,8 +12,8 @@ def build_parser() -> argparse.ArgumentParser:
     return argparse.ArgumentParser(
         prog="python -m stateful_signatures",
         description=(
-            "Didaktische Demo: zustandsbehaftetes Signieren mit Index "
-            "(Lehr-Modell, kein XMSS/RFC 8391)."
+            "Didaktische Demo: Lamport One-Time Signature und Zustandsrisiko "
+            "(Lehr-Modell, kein Merkle/XMSS nach RFC 8391)."
         ),
         epilog=(
             "Benchmark (nach pip install -e \".[dev]\"): "

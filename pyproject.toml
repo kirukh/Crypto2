@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stateful-signatures"
 version = "0.1.0"
-description = "Seminarprojekt: didaktische Demo zu stateful Signaturen und Zustand (XMSS-Theorie in der Ausarbeitung)."
+description = "Seminarprojekt: didaktische Lamport-OTS-Demo zu Zustand und Backup (XMSS in der Ausarbeitung)."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
