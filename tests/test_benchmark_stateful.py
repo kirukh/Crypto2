@@ -1,26 +1,25 @@
-"""Micro-Benchmarks für Sign/Verify (pytest-benchmark)."""
-
 import pytest
+from stateful_signatures.stateful_demo import LamportOTS, verify_lamport
 
-from stateful_signatures.stateful_demo import StatefulSigner, verify
+# Wir definieren Test-Daten
+_PAYLOAD = b"benchmark-payload-123"
 
-_SECRET = b"benchmark-secret-key-32bytes!!"
-_PAYLOAD = b"payload-for-benchmark"
+def test_benchmark_sign(benchmark):
+    # Setup-Funktion: Erstellt für JEDEN Durchlauf einen neuen Signer
+    def setup():
+        return (LamportOTS(), _PAYLOAD), {}
 
+    # Benchmark mit pedantic-Modus, um den State-Fehler zu umgehen
+    benchmark.pedantic(
+        lambda s, m: s.sign(m), 
+        setup=setup, 
+        rounds=100 # Begrenzt die Runden, da KeyGen Zeit kostet
+    )
 
-@pytest.fixture
-def signer():
-    return StatefulSigner(_SECRET)
-
-
-@pytest.fixture
-def sample_sig(signer):
-    return signer.sign(_PAYLOAD)
-
-
-def test_benchmark_sign(benchmark, signer):
-    benchmark(signer.sign, b"message")
-
-
-def test_benchmark_verify(benchmark, sample_sig):
-    benchmark(verify, _SECRET, _PAYLOAD, sample_sig)
+def test_benchmark_verify(benchmark):
+    signer = LamportOTS()
+    msg = _PAYLOAD
+    sig = signer.sign(msg) # Einmal signieren ist okay
+    
+    # Verifizieren ändert den State nicht, daher normaler Benchmark möglich
+    benchmark(verify_lamport, signer.public_key, msg, sig)

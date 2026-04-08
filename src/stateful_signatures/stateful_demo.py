@@ -73,6 +73,39 @@ def verify_lamport(public_key: List[Tuple[bytes, bytes]], message: bytes, signat
             
     return True
 
+def run_demo_scenario():
+    """Simuliert das operative Risiko: Key-Reuse durch Backup-Restore."""
+    print("--- DIDAKTISCHE DEMO: LAMPORT OTS & ZUSTANDSRISIKO ---")
+    
+    # 1. Normaler Ablauf
+    signer = LamportOTS()
+    msg1 = b"Originale Nachricht A"
+    print(f"\n[1] Signiere: '{msg1.decode()}'")
+    sig1 = signer.sign(msg1)
+    print("    -> Signatur 1 erstellt.")
+
+    # 2. Backup-Simulation (Zustandsverlust)
+    print("\n[2] SIMULATION: Ein Backup wird eingespielt.")
+    print("    Der interne Zustand 'is_used' wird auf False zurückgesetzt.")
+    
+    # Wir 'klonen' den Signierer, um ein Backup zu simulieren
+    backup_signer = LamportOTS()
+    backup_signer._private_key = signer._private_key
+    backup_signer.public_key = signer.public_key
+    backup_signer.is_used = False # Der Fehler: Das System 'vergisst', dass schon signiert wurde
+    
+    # 3. Sicherheitsbruch
+    msg2 = b"Gefaelschte Nachricht B"
+    print(f"\n[3] Versuche zweite Signatur mit gleichem Key: '{msg2.decode()}'")
+    
+    # Hier zeigen wir, wie das System im Normalfall reagieren würde
+    try:
+        sig2 = backup_signer.sign(msg2)
+        print("    !!! KRITISCHER FEHLER: Zweite Signatur wurde trotz Key-Reuse erstellt.")
+        print("    Ein Angreifer kann nun Teile des privaten Schlüssels kombinieren!")
+    except RuntimeError as e:
+        print(f"    Schutzmechanismus aktiv: {e}")
+        
 # --- Testlauf für deine CLI / Demo ---
 if __name__ == "__main__":
     print("--- Generiere Lamport OTS Schlüsselpaar ---")

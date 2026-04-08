@@ -1,26 +1,20 @@
 import pytest
+from stateful_signatures.stateful_demo import LamportOTS, verify_lamport
 
-from stateful_signatures.stateful_demo import StatefulSigner, verify
+def test_lamport_sign_and_verify():
+    signer = LamportOTS()
+    message = b"Testnachricht"
+    sig = signer.sign(message)
+    
+    # Korrekte Verifikation
+    assert verify_lamport(signer.public_key, message, sig) is True
+    # Manipulation erkennen
+    assert verify_lamport(signer.public_key, b"Gefaelscht", sig) is False
 
-
-def test_sign_advances_index():
-    s = StatefulSigner(b"k" * 32)
-    assert s.index == 0
-    sig0 = s.sign(b"m")
-    assert sig0.index == 0
-    assert s.index == 1
-    sig1 = s.sign(b"m")
-    assert sig1.index == 1
-    assert verify(b"k" * 32, b"m", sig0)
-    assert verify(b"k" * 32, b"m", sig1)
-
-
-def test_verify_rejects_wrong_message():
-    s = StatefulSigner(b"k" * 32)
-    sig = s.sign(b"original")
-    assert not verify(b"k" * 32, b"tampered", sig)
-
-
-def test_short_secret_rejected():
-    with pytest.raises(ValueError):
-        StatefulSigner(b"short")
+def test_ots_enforcement():
+    signer = LamportOTS()
+    signer.sign(b"Erste Nachricht")
+    
+    # Der zweite Versuch MUSS scheitern (Stateful-Schutz)
+    with pytest.raises(RuntimeError, match="SECURITY BREACH"):
+        signer.sign(b"Zweite Nachricht")
