@@ -1,84 +1,93 @@
-"""
-Lehr-Demo: zustandsbehaftetes Signieren mit Monotonie des Index.
-
-Das ist bewusst kein XMSS (kein Merkle, keine echten OTS nach RFC 8391), sondern
-ein minimales Modell: jede Signatur ist an einen Index gebunden; der geheime
-Schlüssel zählt vorwärts. So lassen sich Zustand, Backup und Wiederverwendung
-des gleichen Index anschaulich machen — passend zur schriftlichen Ausarbeitung.
-"""
-
-from __future__ import annotations
-
+import os
 import hashlib
-import hmac
-from dataclasses import dataclass
+from typing import List, Tuple
 
+class LamportOTS:
+    """
+    Didaktische Implementierung einer Lamport One-Time Signature (OTS).
+    Achtung: Nur für Lehrzwecke! Nicht side-channel-gehärtet.
+    """
+    def __init__(self):
+        # 1. Schlüsselgenerierung: 256 Paare aus 32-Byte Zufallswerten
+        self._private_key: List[Tuple[bytes, bytes]] = []
+        self.public_key: List[Tuple[bytes, bytes]] = []
+        self.is_used = False  # Unser entscheidender Zustand!
 
-@dataclass(frozen=True)
-class Signature:
-    """Signatur: Index (Zustand zum Signierzeitpunkt) + MAC über Nachricht und Index."""
+        for _ in range(256):
+            # Zwei geheime 32-Byte Strings pro Bit
+            sk_0 = os.urandom(32)
+            sk_1 = os.urandom(32)
+            self._private_key.append((sk_0, sk_1))
+            
+            # Der öffentliche Schlüssel besteht aus den Hashes dieser Geheimnisse
+            pk_0 = hashlib.sha256(sk_0).digest()
+            pk_1 = hashlib.sha256(sk_1).digest()
+            self.public_key.append((pk_0, pk_1))
 
-    index: int
-    tag: bytes
+    def _hash_message_to_bits(self, message: bytes) -> str:
+        """Hilfsfunktion: Hasht die Nachricht und gibt sie als 256-stelligen Bit-String zurück."""
+        msg_hash = hashlib.sha256(message).digest()
+        # Wandle jedes Byte in 8 Bits um (z.B. '01001101')
+        return ''.join(f'{byte:08b}' for byte in msg_hash)
 
+    def sign(self, message: bytes) -> List[bytes]:
+        """Signiert die Nachricht und konsumiert den OTS-Zustand."""
+        if self.is_used:
+            # Hier greift unser operatives Risiko!
+            raise RuntimeError("SECURITY BREACH: Dieser OTS-Schlüssel wurde bereits verwendet! Zustand korrumpiert.")
+        
+        bits = self._hash_message_to_bits(message)
+        signature = []
 
-class StatefulSigner:
-    """Hält einen geheimen Schlüssel und einen fortlaufenden Signaturindex."""
+        # Wähle für jedes Bit den passenden Teil des privaten Schlüssels
+        for i, bit in enumerate(bits):
+            if bit == '0':
+                signature.append(self._private_key[i][0])
+            else:
+                signature.append(self._private_key[i][1])
+                
+        # ZUSTAND AKTUALISIEREN (Atomarität in der Praxis extrem wichtig!)
+        self.is_used = True 
+        
+        return signature
 
-    def __init__(self, secret: bytes) -> None:
-        if len(secret) < 16:
-            raise ValueError("Geheimer Schlüssel sollte mindestens 16 Byte haben.")
-        self._secret = secret
-        self.index = 0
+def verify_lamport(public_key: List[Tuple[bytes, bytes]], message: bytes, signature: List[bytes]) -> bool:
+    """Verifiziert die Signatur gegen den öffentlichen Schlüssel."""
+    if len(signature) != 256:
+        return False
+        
+    msg_hash = hashlib.sha256(message).digest()
+    bits = ''.join(f'{byte:08b}' for byte in msg_hash)
 
-    def sign(self, message: bytes) -> Signature:
-        idx = self.index
-        payload = message + idx.to_bytes(8, "big", signed=False)
-        tag = hmac.new(self._secret, payload, hashlib.sha256).digest()
-        self.index += 1
-        return Signature(index=idx, tag=tag)
+    # Prüfe für jedes Bit, ob der Hash der Signatur zum öffentlichen Schlüssel passt
+    for i, bit in enumerate(bits):
+        sig_part_hash = hashlib.sha256(signature[i]).digest()
+        
+        if bit == '0':
+            expected_hash = public_key[i][0]
+        else:
+            expected_hash = public_key[i][1]
+            
+        if sig_part_hash != expected_hash:
+            return False
+            
+    return True
 
-    def export_state(self) -> tuple[bytes, int]:
-        """Für Demo: Zustand sichern (Schlüssel + Index). In der Praxis: nur index/sicher speichern."""
-        return self._secret, self.index
-
-    @classmethod
-    def from_state(cls, secret: bytes, index: int) -> StatefulSigner:
-        s = cls(secret)
-        s.index = index
-        return s
-
-
-def verify(secret: bytes, message: bytes, sig: Signature) -> bool:
-    payload = message + sig.index.to_bytes(8, "big", signed=False)
-    expected = hmac.new(secret, payload, hashlib.sha256).digest()
-    return hmac.compare_digest(expected, sig.tag)
-
-
-def run_demo_scenario() -> None:
-    """Gibt eine kurze Szenario-Ausgabe auf stdout (z. B. für Präsentation / CLI)."""
-    secret = b"demo-secret-key-min-16b!!"
-    signer = StatefulSigner(secret)
-
-    msg = b"Vertrag Nr. 42"
-    for _ in range(3):
-        signer.sign(msg)
-
-    print("Didaktische Demo: zustandsbehaftete Signatur (Modell, kein XMSS)\n")
-    print(f"Nach drei Signaturen (gleiche Nachricht): aktueller Index = {signer.index}")
-
-    last_msg = "Letzte gültige Nachricht".encode("utf-8")
-    sig_ok = signer.sign(last_msg)
-    print(f"Neue Signatur: index={sig_ok.index}, verifiziert: {verify(secret, last_msg, sig_ok)}")
-
-    # Simuliertes altes Backup: Index steht weiter hinten als ein wiederhergestellter Stand
-    stale = StatefulSigner.from_state(secret, index=2)
-    sig_reuse = stale.sign(b"Nach Restore")
-    print(
-        f"\nNach 'Wiederherstellung' eines älteren Zustands (Index={stale.index - 1}): "
-        f"neue Signatur index={sig_reuse.index}"
-    )
-    print(
-        "Hinweis: In echten OTS/XMSS würde ein erneutes Signieren mit einem "
-        "bereits verbrauchten Index die Sicherheit brechen — hier nur Illustration des Zählerproblems."
-    )
+# --- Testlauf für deine CLI / Demo ---
+if __name__ == "__main__":
+    print("--- Generiere Lamport OTS Schlüsselpaar ---")
+    signer = LamportOTS()
+    
+    msg1 = b"Meine erste sichere Nachricht"
+    print(f"\nSigniere: '{msg1.decode()}'")
+    sig1 = signer.sign(msg1)
+    
+    is_valid = verify_lamport(signer.public_key, msg1, sig1)
+    print(f"Verifikation erfolgreich? {is_valid}")
+    
+    print("\n--- Simuliere Backup/Zähler-Desynchronisation (erneuter Signaturversuch) ---")
+    msg2 = b"Angreifer-Nachricht nach Backup-Restore"
+    try:
+        sig2 = signer.sign(msg2)
+    except RuntimeError as e:
+        print(f"Erwarteter Fehler abgefangen: {e}")
